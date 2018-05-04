@@ -9,7 +9,8 @@ output: html_document
 
 ```{r Define paths, eval=FALSE, engine='bash'}
 
-GFF_Path=~/home/ebazzicalupo/Data #path to gff data
+# path to gff data
+GFF_Path=~/home/ebazzicalupo/Data
 
 ```
 
@@ -18,11 +19,97 @@ GFF_Path=~/home/ebazzicalupo/Data #path to gff data
 ```{r Search in Annotations, eval=FALSE, engine='bash'}
 
 cd $GFF_Path
-GENES=$(cat GeneList.txt) #file containing list of genes
+
+# list elements in file containing list of genes
+GENES=$(cat GeneList.txt) 
+
+#for each gene create a file containing results
 for i in ${GENES[@]}
   do
-  grep "${i}" LYPA23C.all.fix.gff3 > resultados_${i}.txt #for each gene create a file containing results
-done  
+  grep "${i}" LYPA23C.all.fix.gff3 > ${i}
+done
+
+
+```
+
+#2a: Search empty results in Cat annotations
+
+```{r Search in Annotations, eval=FALSE, engine='bash'}
+
+cd $GFF_Path
+
+# grab all empty results and print names in file
+wc -l * | grep ' 0 ' | cut -d ' ' -f9 > CatSearch.txt
+
+# list elements in file containing list of genes
+CATGENES=$(cat CatSearch.txt)
+
+# for each gene create a gff3 file containing results
+for i in ${CATGENES[@]}
+  do
+  grep "${i}" Felis_catus.Felis_catus_8.0.92.gff3 > cat_${i}.gff3
+done
+
+```
+
+#2b: Generate Cat gene fasta file for BLAST (example for 1 file) - Bedtools installation required
+
+```{r Search in Annotations, eval=FALSE, engine='bash'}
+
+cd $GFF_Path
+
+# create gene file for trial
+grep "agouti" Felis_catus.Felis_catus_8.0.92.gff3 > cat_agouti.gff3 
+
+# generate fasta file (-fo) from input fasta file (-fi) using coordinates specified in other file (-bed)
+bedtools getfasta -fo try.fa -fi Felis_catus.Felis_catus_8.0.dna_sm.toplevel.fa -bed cat_agouti.gff3
+
+
+```
+
+#2c: Generate Cat gene fasta files for BLAST - Bedtools installation required
+
+```{r Search in Annotations, eval=FALSE, engine='bash'}
+
+cd $GFF_Path
+
+# list all cat gene coordinates files
+CATcoords=$(ls cat_*.gff3)
+
+# generate fasta file for each gene.gff3 coordinates file
+for i in ${CATcoords[@]}
+  do
+  bedtools getfasta -fo "${i}".fa -fi Felis_catus.Felis_catus_8.0.dna_sm.toplevel.fa -bed ${i}
+done
+
+```
+
+#2d: BLAST cat genes to Lynx genome - BLAST installation required (from NCBI)
+
+```{r Search in Annotations, eval=FALSE, engine='bash'}
+
+cd $GFF_Path
+
+# create BLASTdatabase (directory and database inside) from FASTA lynx reference genome
+
+mkdir BLASTdatabaseII
+
+BDB=~/home/ebazzicalupo/Data/BLASTdatabase/
+
+makeblastdb -in $BDB/lp23_plus_mt.fa -parse_seqids -dbtype nucl 
+
+cd $GFF_Path
+
+BLASTGENES=$(ls cat_*.fa)
+
+for GENE in ${BLASTGENES[@]}
+  do
+  blastn -query ${GENE} -db $BDB -outfmt "6 qseqid sseqid staxids evalue"
+  echo "$GENE BLAST finished"
+  cd $GFF_Path
+  
+done
+
 
 
 ```
