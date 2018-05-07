@@ -22,12 +22,15 @@ GFF_Path=~/home/ebazzicalupo/Data
 cd $GFF_Path
 
 # list elements in file containing list of genes
-GENES=$(cat GeneList.txt) 
+GENES=$(cat GeneList.txt)
+
+mkdir LynxResults
 
 #for each gene create a file containing results
 for i in ${GENES[@]}
   do
   grep "${i}" LYPA23C.all.fix.gff3 > ${i}
+  mv ${i} LynxResults
 done
 
 
@@ -39,8 +42,16 @@ done
 
 cd $GFF_Path
 
+cd LynxResults
+
 # grab all empty results and print names in file
 wc -l * | grep ' 0 ' | cut -d ' ' -f9 > CatSearch.txt
+
+mv CatSearch.txt $GFF_Path
+
+cd $GFF_Path
+
+mkdir CatResults
 
 # list elements in file containing list of genes
 CATGENES=$(cat CatSearch.txt)
@@ -49,6 +60,7 @@ CATGENES=$(cat CatSearch.txt)
 for i in ${CATGENES[@]}
   do
   grep "${i}" Felis_catus.Felis_catus_8.0.92.gff3 > cat_${i}.gff3
+  mv cat_${i}.gff3 CatResults
 done
 
 ```
@@ -60,7 +72,9 @@ done
 cd $GFF_Path
 
 # create gene file for trial
-grep "agouti" Felis_catus.Felis_catus_8.0.92.gff3 > cat_agouti.gff3 
+grep "agouti" Felis_catus.Felis_catus_8.0.92.gff3 > cat_agouti.gff3
+
+mv cat_agouti.gff3 Cat_Results
 
 # generate fasta file (-fo) from input fasta file (-fi) using coordinates specified in other file (-bed)
 bedtools getfasta -fo try.fa -fi Felis_catus.Felis_catus_8.0.dna_sm.toplevel.fa -bed cat_agouti.gff3
@@ -72,7 +86,7 @@ bedtools getfasta -fo try.fa -fi Felis_catus.Felis_catus_8.0.dna_sm.toplevel.fa 
 
 ```{r Search in Annotations, eval=FALSE, engine='bash'}
 
-cd $GFF_Path
+cd $GFF_Path/CatResults
 
 # list all cat gene coordinates files
 CATcoords=$(ls cat_*.gff3)
@@ -80,7 +94,7 @@ CATcoords=$(ls cat_*.gff3)
 # generate fasta file for each gene.gff3 coordinates file
 for i in ${CATcoords[@]}
   do
-  bedtools getfasta -fo "${i}".fa -fi Felis_catus.Felis_catus_8.0.dna_sm.toplevel.fa -bed ${i}
+  bedtools getfasta -fo "${i}".fa -fi $GFF_Path/Felis_catus.Felis_catus_8.0.dna_sm.toplevel.fa -bed ${i}
 done
 
 ```
@@ -103,20 +117,23 @@ makeblastdb -in $BDB/lp23_plus_mt.fa -parse_seqids -dbtype nucl
 
 # BLAST procedure with new directory containing results file for each GENE (look at BLAST manual for output options)
 
-cd $GFF_Path
+cd $GFF_Path/CatResults
 
 BLASTGENES=$(ls cat_*.fa)
 
 for GENE in ${BLASTGENES[@]}
   do
   echo "$GENE starting BLAST"
-  mkdir ${GENE/.gff3.fa/}
-  cd ${GENE/.gff3.fa/}
-  blastn -query $GFF_Path/${GENE} -db $BDB/lp23_plus_mt.fa -outfmt "6 qseqid sseqid sstart send length qcovhsp evalue" -out ${GENE/.gff3.fa/}BLASTresults
+  blastn -query $GFF_Path/CatResults/${GENE} -db $BDB/lp23_plus_mt.fa -outfmt "6 qseqid sseqid sstart send length qcovhsp evalue" -out ${GENE/.gff3.fa/}.BLASTresults
   echo "$GENE BLAST finished"
-  cd $GFF_Path
   
 done
+
+# Move BLASTresults to new directory
+
+mkdir BLASTresults
+
+mv *.BLASTresults BLASTresults
 
 ```
 
