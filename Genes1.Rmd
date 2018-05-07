@@ -2,7 +2,8 @@
 title: "Genes1"
 author: "Enrico"
 date: "24 April 2018"
-output: html_document
+output:
+  html_document: default
 ---
 
 #0a: Define paths.
@@ -52,7 +53,7 @@ done
 
 ```
 
-#2b: Generate Cat gene fasta file for BLAST (example for 1 file) - Bedtools installation required
+#2b: (EXAMPLE FOR 1 FILE): Generate Cat gene fasta file for BLAST - Bedtools installation required
 
 ```{r Search in Annotations, eval=FALSE, engine='bash'}
 
@@ -90,13 +91,17 @@ done
 
 cd $GFF_Path
 
-# create BLASTdatabase (directory and database inside) from FASTA lynx reference genome
+# create lynx BLASTdatabase (directory and database inside) from FASTA lynx reference genome
 
-mkdir BLASTdatabaseII
+mkdir BLASTdatabase
 
-BDB=~/home/ebazzicalupo/Data/BLASTdatabase/
+BDB=~/home/ebazzicalupo/Data/BLASTdatabase
 
-makeblastdb -in $BDB/lp23_plus_mt.fa -parse_seqids -dbtype nucl 
+mv lp23_plus_mt.fa $BDB
+
+makeblastdb -in $BDB/lp23_plus_mt.fa -parse_seqids -dbtype nucl
+
+# BLAST procedure with new directory containing results file for each GENE (look at BLAST manual for output options)
 
 cd $GFF_Path
 
@@ -104,13 +109,16 @@ BLASTGENES=$(ls cat_*.fa)
 
 for GENE in ${BLASTGENES[@]}
   do
-  blastn -query ${GENE} -db $BDB -outfmt "6 qseqid sseqid staxids evalue"
+  echo "$GENE starting BLAST"
+  mkdir ${GENE/.gff3.fa/}
+  cd ${GENE/.gff3.fa/}
+  blastn -query $GFF_Path/${GENE} -db $BDB/lp23_plus_mt.fa -outfmt "6 qseqid sseqid sstart send length qcovhsp evalue" -out ${GENE/.gff3.fa/}BLASTresults
   echo "$GENE BLAST finished"
   cd $GFF_Path
   
 done
 
-
-
 ```
+
+
 
