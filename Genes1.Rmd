@@ -67,7 +67,7 @@ done
 
 #2b: (EXAMPLE FOR 1 FILE): Generate Cat gene fasta file for BLAST - Bedtools installation required
 
-```{r Search in Annotations, eval=FALSE, engine='bash'}
+```{r Generate Cat gene fasta file for BLAST, eval=FALSE, engine='bash'}
 
 cd $GFF_Path
 
@@ -84,7 +84,7 @@ bedtools getfasta -fo try.fa -fi Felis_catus.Felis_catus_8.0.dna_sm.toplevel.fa 
 
 #2c: Generate Cat gene fasta files for BLAST - Bedtools installation required
 
-```{r Search in Annotations, eval=FALSE, engine='bash'}
+```{r Generate Cat gene fasta files for BLAST, eval=FALSE, engine='bash'}
 
 cd $GFF_Path/CatResults
 
@@ -94,14 +94,14 @@ CATcoords=$(ls cat_*.gff3)
 # generate fasta file for each gene.gff3 coordinates file
 for i in ${CATcoords[@]}
   do
-  bedtools getfasta -fo "${i}".fa -fi $GFF_Path/Felis_catus.Felis_catus_8.0.dna_sm.toplevel.fa -bed ${i}
+  bedtools getfasta -fo "${i/.gff3}".fa -fi $GFF_Path/Felis_catus.Felis_catus_8.0.dna_sm.toplevel.fa -bed ${i}
 done
 
 ```
 
 #2d: BLAST cat genes to Lynx genome - BLAST installation required (from NCBI)
 
-```{r Search in Annotations, eval=FALSE, engine='bash'}
+```{r  BLAST cat genes to Lynx genome, eval=FALSE, engine='bash'}
 
 cd $GFF_Path
 
@@ -119,12 +119,12 @@ makeblastdb -in $BDB/lp23_plus_mt.fa -parse_seqids -dbtype nucl
 
 cd $GFF_Path/CatResults
 
-BLASTGENES=$(ls cat_*.fa)
+CBLASTGENES=$(ls cat_*.fa)
 
-for GENE in ${BLASTGENES[@]}
+for GENE in ${CBLASTGENES[@]}
   do
   echo "$GENE starting BLAST"
-  blastn -query $GFF_Path/CatResults/${GENE} -db $BDB/lp23_plus_mt.fa -outfmt "6 qseqid sseqid sstart send length qcovhsp evalue" -out ${GENE/.gff3.fa/}.BLASTresults
+  blastn -query $GFF_Path/CatResults/${GENE} -db $BDB/lp23_plus_mt.fa -outfmt "6 qseqid sseqid sstart send length qcovhsp evalue" -out ${GENE/.fa/}.BLASTresults
   echo "$GENE BLAST finished"
   
 done
@@ -137,5 +137,89 @@ mv *.BLASTresults BLASTresults
 
 ```
 
+#3a: Search cat empty results in Human annotations
 
+```{r Search cat empty results in Human annotations, eval=FALSE, engine='bash'}
+
+cd $GFF_Path
+
+cd CatResults
+
+# grab all empty results and print names in file cutting the 'cat_' part
+wc -l *.gff3 | grep ' 0 ' | cut -d ' ' -f9 | sed 's/cat_//g' > HumanSearch.txt
+
+mv HumanSearch.txt $GFF_Path
+
+cd $GFF_Path
+
+mkdir HumanResults
+
+# list elements in file containing list of genes
+HUMANGENES=$(cat HumanSearch.txt)
+
+# for each gene create a gff3 file containing results and move it to HumanResults folder
+for i in ${HUMANGENES[@]}
+  do
+  grep "${i/.gff3/}" Homo_sapiens.GRCh38.92.gff3 > human_${i/.gff3/}.gff3
+  mv human_${i/.gff3/}.gff3 HumanResults
+done
+
+```
+
+#3b: Generate Human gene fasta files for BLAST - Bedtools installation required
+
+```{r Generate Human gene fasta files for BLAST, eval=FALSE, engine='bash'}
+
+cd $GFF_Path/HumanResults
+
+# list all cat gene coordinates files
+HUMANcoords=$(ls human_*.gff3)
+
+# generate fasta file for each gene.gff3 coordinates file
+for i in ${HUMANcoords[@]}
+  do
+  bedtools getfasta -fo "${i/.gff3}".fa -fi $GFF_Path/Homo_sapiens.GRCh38.dna_sm.toplevel.fa -bed ${i}
+done
+
+```
+
+#3c BLAST human genes to Lynx genome - BLAST installation required (from NCBI)
+
+```{r  BLAST human genes to Lynx genome, eval=FALSE, engine='bash'}
+
+cd $GFF_Path
+
+# create lynx BLASTdatabase (directory and database inside) from FASTA lynx reference genome
+# ALREADY DONE IN PREVIOUS STEPS
+
+mkdir BLASTdatabase
+
+BDB=~/home/ebazzicalupo/Data/BLASTdatabase
+
+mv lp23_plus_mt.fa $BDB
+
+makeblastdb -in $BDB/lp23_plus_mt.fa -parse_seqids -dbtype nucl
+
+# BLAST procedure with new directory containing results file for each GENE (look at BLAST manual for output options)
+
+cd $GFF_Path/HumanResults
+
+HBLASTGENES=$(ls human_*.fa)
+
+for GENE in ${HBLASTGENES[@]}
+  do
+  echo "$GENE starting BLAST"
+  blastn -query $GFF_Path/HumanResults/${GENE} -db $BDB/lp23_plus_mt.fa -outfmt "6 qseqid sseqid sstart send length qcovhsp evalue" -out ${GENE/.fa/}.BLASTresults
+  echo "$GENE BLAST finished"
+  
+done
+
+# Move BLASTresults to new directory
+
+mkdir BLASTresults
+
+mv *.BLASTresults BLASTresults
+
+
+```
 
