@@ -10,8 +10,11 @@ output:
 
 ```{r Define paths, eval=FALSE, engine='bash'}
 
-# path to gff data
+# path to gff data in my laptop
 GFF_Path=~/home/ebazzicalupo/Data
+
+# path to gff data in server
+GFF_Path=~/Data
 
 ```
 
@@ -29,7 +32,7 @@ mkdir LynxResults
 #for each gene create a file containing results
 for i in ${GENES[@]}
   do
-  grep "${i}" LYPA23C.all.fix.gff3 > ${i}
+  grep -i "${i}" LYPA23C.all.fix.gff3 > ${i}
   mv ${i} LynxResults
 done
 
@@ -44,8 +47,11 @@ cd $GFF_Path
 
 cd LynxResults
 
-# grab all empty results and print names in file
+# grab all empty results and print names in file in my laptop
 wc -l * | grep ' 0 ' | cut -d ' ' -f9 > CatSearch.txt
+
+# grab all empty results and print names in file in Server
+wc -l * | grep ' 0 ' | cut -d ' ' -f6 > CatSearch.txt
 
 mv CatSearch.txt $GFF_Path
 
@@ -59,7 +65,7 @@ CATGENES=$(cat CatSearch.txt)
 # for each gene create a gff3 file containing results
 for i in ${CATGENES[@]}
   do
-  grep "${i}" Felis_catus.Felis_catus_8.0.92.gff3 > cat_${i}.gff3
+  grep -i "${i}" Felis_catus.Felis_catus_8.0.92.gff3 > cat_${i}.gff3
   mv cat_${i}.gff3 CatResults
 done
 
@@ -88,6 +94,17 @@ bedtools getfasta -fo try.fa -fi Felis_catus.Felis_catus_8.0.dna_sm.toplevel.fa 
 
 cd $GFF_Path/CatResults
 
+# remove empty results in server
+
+wc -l * | grep ' 0 ' | cut -d ' ' -f5 > Removelist.txt
+
+REMlist=$(cat Removelist.txt)
+
+for i in ${REMlist[@]}
+  do
+  rm ${i}
+done
+
 # list all cat gene coordinates files
 CATcoords=$(ls cat_*.gff3)
 
@@ -109,7 +126,10 @@ cd $GFF_Path
 
 mkdir BLASTdatabase
 
+# in my laptop
 BDB=~/home/ebazzicalupo/Data/BLASTdatabase
+# in server
+BDB=~/Data/BLASTdatabase
 
 mv lp23_plus_mt.fa $BDB
 
@@ -145,8 +165,11 @@ cd $GFF_Path
 
 cd CatResults
 
-# grab all empty results and print names in file cutting the 'cat_' part
+# grab all empty results and print names in file cutting the 'cat_' part in my laptop
 wc -l *.gff3 | grep ' 0 ' | cut -d ' ' -f9 | sed 's/cat_//g' > HumanSearch.txt
+
+# grab all empty results and print names in file cutting the 'cat_' part in Server
+cat Removelist.txt | sed 's/cat_//g' > HumanSearch.txt
 
 mv HumanSearch.txt $GFF_Path
 
@@ -160,7 +183,7 @@ HUMANGENES=$(cat HumanSearch.txt)
 # for each gene create a gff3 file containing results and move it to HumanResults folder
 for i in ${HUMANGENES[@]}
   do
-  grep "${i/.gff3/}" Homo_sapiens.GRCh38.92.gff3 > human_${i/.gff3/}.gff3
+  grep -i "${i/.gff3/}" Homo_sapiens.GRCh38.92.gff3 > human_${i/.gff3/}.gff3
   mv human_${i/.gff3/}.gff3 HumanResults
 done
 
@@ -223,3 +246,21 @@ mv *.BLASTresults BLASTresults
 
 ```
 
+#4a copy BLASTresults files from server to laptop
+
+```{r  BLAST human genes to Lynx genome, eval=FALSE, engine='bash'}
+
+# cat greps
+scp ebazzicalupo@genomics-a.ebd.csic.es:~/Data/CatResults/*.gff3 ~/home/ebazzicalupo/GrepResults
+
+# cat coordinates
+scp ebazzicalupo@genomics-a.ebd.csic.es:~/Data/CatResults/BLASTresults/cat_*.BLASTresults ~/home/ebazzicalupo/Results
+
+# human greps
+scp ebazzicalupo@genomics-a.ebd.csic.es:~/Data/HumanResults/*.gff3 ~/home/ebazzicalupo/GrepResults
+
+# human
+scp ebazzicalupo@genomics-a.ebd.csic.es:~/Data/HumanResults/BLASTresults/human_*.BLASTresults ~/home/ebazzicalupo/Results
+
+
+```
