@@ -29,10 +29,13 @@ GENES=$(cat GeneList.txt)
 
 mkdir LynxResults
 
+# define the end of a line as a separator for elements so that each WHOLE line in GeneList.txt will be a search entry
+IFS=$'\n' 
+
 #for each gene create a file containing results
 for i in ${GENES[@]}
   do
-  grep -i "${i}" LYPA23C.all.fix.gff3 > ${i}
+  grep -i -E "${i}" LYPA23C.all.fix.gff3 > ${i}
   mv ${i} LynxResults
 done
 
@@ -47,11 +50,13 @@ cd $GFF_Path
 
 cd LynxResults
 
+wc -l * | grep ' 0 ' | cut -d '0' -f2 | sed 's/ //'
+
 # grab all empty results and print names in file in my laptop
-wc -l * | grep ' 0 ' | cut -d ' ' -f9 > CatSearch.txt
+wc -l * | grep ' 0 ' | cut -d '0' -f2 | sed 's/ //' > CatSearch.txt
 
 # grab all empty results and print names in file in Server
-wc -l * | grep ' 0 ' | cut -d ' ' -f6 > CatSearch.txt
+wc -l * | grep ' 0 ' | cut -d '0' -f2 | sed 's/ //' > CatSearch.txt
 
 mv CatSearch.txt $GFF_Path
 
@@ -62,10 +67,15 @@ mkdir CatResults
 # list elements in file containing list of genes
 CATGENES=$(cat CatSearch.txt)
 
+cat CatSearch.txt
+
+# define the end of a line as a separator for elements so that each WHOLE line in GeneList.txt will be a search entry
+IFS=$'\n' 
+
 # for each gene create a gff3 file containing results
 for i in ${CATGENES[@]}
   do
-  grep -i "${i}" Felis_catus.Felis_catus_8.0.92.gff3 > cat_${i}.gff3
+  grep -i -E "{i}" Felis_catus.Felis_catus_8.0.92.gff3 > cat_${i}.gff3
   mv cat_${i}.gff3 CatResults
 done
 
@@ -165,11 +175,19 @@ cd $GFF_Path
 
 cd CatResults
 
+wc -l *.gff3 | grep ' 0 ' | cut -d '0' -f2 | sed 's/cat_//' | sed 's/ //'
+
 # grab all empty results and print names in file cutting the 'cat_' part in my laptop
-wc -l *.gff3 | grep ' 0 ' | cut -d ' ' -f9 | sed 's/cat_//g' > HumanSearch.txt
+wc -l *.gff3 | grep ' 0 ' | cut -d '0' -f2 | sed 's/cat_//' | sed 's/ //' > HumanSearch.txt
 
 # grab all empty results and print names in file cutting the 'cat_' part in Server
+wc -l *.gff3 | grep ' 0 ' | cut -d '0' -f2 | sed 's/cat_//g' | sed 's/ //g' > HumanSearch.txt
+
+# if using Removelist.txt
 cat Removelist.txt | sed 's/cat_//g' > HumanSearch.txt
+
+# Before proceeding, check if 'total' line is present, if it is, remove it using nano
+nano HumanSearch.txt
 
 mv HumanSearch.txt $GFF_Path
 
