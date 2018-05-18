@@ -50,34 +50,17 @@ cd $GFF_Path
 
 cd LynxResults
 
-wc -l * | grep ' 0 ' | cut -d '0' -f2 | sed 's/ //'
-
-# grab all empty results and print names in file in my laptop
-wc -l * | grep ' 0 ' | cut -d '0' -f2 | sed 's/ //' > CatSearch.txt
-
-# grab all empty results and print names in file in Server
-wc -l * | grep ' 0 ' | cut -d '0' -f2 | sed 's/ //' > CatSearch.txt
-
-mv CatSearch.txt $GFF_Path
-
 cd $GFF_Path
 
 mkdir CatResults
 
-# list elements in file containing list of genes
-CATGENES=$(cat CatSearch.txt)
-
-cat CatSearch.txt
+# Grab empty results from Lynx search - ALTERNATIVE: without .txt file
+CATGENES=$(wc -l LynxResults/* | grep ' 0 ' | cut -d '0' -f2 | sed 's/ //' | sed 's/LynxResults\///')
 
 # define the end of a line as a separator for elements so that each WHOLE line in GeneList.txt will be a search entry
-IFS=$'\n' 
+IFS=$'\n'
 
-# for each gene create a gff3 file containing results
-for i in ${CATGENES[@]}
-  do
-  grep -i -E "{i}" Felis_catus.Felis_catus_8.0.92.gff3 > cat_${i}.gff3
-  mv cat_${i}.gff3 CatResults
-done
+for i in $CATGENES; do grep -i -E "${i}" Felis_catus.Felis_catus_8.0.92.gff3 > cat_"${i}".gff3; mv cat_"${i}".gff3 CatResults; done
 
 ```
 
@@ -115,13 +98,24 @@ for i in ${REMlist[@]}
   rm ${i}
 done
 
+# Remove non-gene (e.g. mRNA) strings from .gff3 results
+
+cd $GFF_Path/CatResults
+
+CATREFINE=$(ls cat_*.gff3)
+
+for i in ${CATREFINE[@]}
+  do
+  awk -v "key=gene" '$3 == key {print($0)}' ${i} > ${i/.gff3}.gene.gff3
+done
+
 # list all cat gene coordinates files
-CATcoords=$(ls cat_*.gff3)
+CATcoords=$(ls cat_*.gene.gff3)
 
 # generate fasta file for each gene.gff3 coordinates file
 for i in ${CATcoords[@]}
   do
-  bedtools getfasta -fo "${i/.gff3}".fa -fi $GFF_Path/Felis_catus.Felis_catus_8.0.dna_sm.toplevel.fa -bed ${i}
+  bedtools getfasta -fo "${i/.gene.gff3}".fa -fi $GFF_Path/Felis_catus.Felis_catus_8.0.dna_sm.toplevel.fa -bed ${i}
 done
 
 ```
@@ -173,36 +167,17 @@ mv *.BLASTresults BLASTresults
 
 cd $GFF_Path
 
-cd CatResults
-
-wc -l *.gff3 | grep ' 0 ' | cut -d '0' -f2 | sed 's/cat_//' | sed 's/ //'
-
-# grab all empty results and print names in file cutting the 'cat_' part in my laptop
-wc -l *.gff3 | grep ' 0 ' | cut -d '0' -f2 | sed 's/cat_//' | sed 's/ //' > HumanSearch.txt
-
-# grab all empty results and print names in file cutting the 'cat_' part in Server
-wc -l *.gff3 | grep ' 0 ' | cut -d '0' -f2 | sed 's/cat_//g' | sed 's/ //g' > HumanSearch.txt
-
-# if using Removelist.txt
-cat Removelist.txt | sed 's/cat_//g' > HumanSearch.txt
-
-# Before proceeding, check if 'total' line is present, if it is, remove it using nano
-nano HumanSearch.txt
-
-mv HumanSearch.txt $GFF_Path
-
-cd $GFF_Path
-
 mkdir HumanResults
 
-# list elements in file containing list of genes
-HUMANGENES=$(cat HumanSearch.txt)
+# Grab empty results from Cat search - ALNTERNATIVE, with no .txt file
+
+HUMANGENES=$(wc -l CatResults/*.gene.gff3 | grep ' 0 ' | cut -d '0' -f2 | sed 's/CatResults\/cat_//g' | sed 's/ //')
 
 # for each gene create a gff3 file containing results and move it to HumanResults folder
 for i in ${HUMANGENES[@]}
   do
-  grep -i "${i/.gff3/}" Homo_sapiens.GRCh38.92.gff3 > human_${i/.gff3/}.gff3
-  mv human_${i/.gff3/}.gff3 HumanResults
+  grep -i "${i/.gene.gff3/}" Homo_sapiens.GRCh38.92.gff3 > human_${i/.gene.gff3/}.gff3
+  mv human_${i/.gene.gff3/}.gff3 HumanResults
 done
 
 ```
@@ -210,16 +185,25 @@ done
 #3b: Generate Human gene fasta files for BLAST - Bedtools installation required
 
 ```{r Generate Human gene fasta files for BLAST, eval=FALSE, engine='bash'}
+# Remove non-gene (e.g. mRNA) strings from .gff3 results
 
 cd $GFF_Path/HumanResults
 
+HUMANREFINE=$(ls human_*.gff3)
+
+for i in ${HUMANREFINE[@]}
+  do
+  awk -v "key=gene" '$3 == key {print($0)}' ${i} > ${i/.gff3}.gene.gff3
+done
+
+
 # list all cat gene coordinates files
-HUMANcoords=$(ls human_*.gff3)
+HUMANcoords=$(ls human_*.gene.gff3)
 
 # generate fasta file for each gene.gff3 coordinates file
 for i in ${HUMANcoords[@]}
   do
-  bedtools getfasta -fo "${i/.gff3}".fa -fi $GFF_Path/Homo_sapiens.GRCh38.dna_sm.toplevel.fa -bed ${i}
+  bedtools getfasta -fo "${i/.gene.gff3}".fa -fi $GFF_Path/Homo_sapiens.GRCh38.dna_sm.toplevel.fa -bed ${i}
 done
 
 ```
