@@ -42,6 +42,24 @@ done
 
 ```
 
+#1b: Refine Lynx Results - Unique Parent Gene IDs
+
+```{r Refine Lynx Results, eval=FALSE, engine='bash'}
+
+cd $GFF_Path/LynxResults
+
+LYNXREFINE=$(ls *)
+
+mkdir ParentIDs
+
+for i in ${LYNXREFINE[@]}
+  do cut -d ';' -f2 "${i}" | sort -u > "${i}".Parent
+  mv "${i}".Parent ParentIDs
+done
+
+
+```
+
 #2a: Search empty results in Cat annotations
 
 ```{r Search in Annotations, eval=FALSE, engine='bash'}
@@ -250,7 +268,7 @@ mv *.BLASTresults BLASTresults
 
 #4a copy BLASTresults files from server to laptop
 
-```{r  BLAST human genes to Lynx genome, eval=FALSE, engine='bash'}
+```{r  copy BLASTresults files from server to laptop, eval=FALSE, engine='bash'}
 
 # cat greps
 scp ebazzicalupo@genomics-a.ebd.csic.es:~/Data/CatResults/*.gff3 ~/home/ebazzicalupo/GrepResults
@@ -266,3 +284,78 @@ scp ebazzicalupo@genomics-a.ebd.csic.es:~/Data/HumanResults/BLASTresults/human_*
 
 
 ```
+
+#5a Create .gff3 / .bed of genes from ParentIDs
+
+```{r  Create .gff3 of genes from ParentIDs, eval=FALSE, engine='bash'}
+
+cd $GFF_Path/LynxResults/ParentIDs
+
+cat * > ID.txt
+
+mv ID.txt $GFF_Path
+
+cd $GFF_Path
+
+# create .gff3 file
+grep -f ID.txt LYPA23C.all.fix.gff3 > Candidate.gff3
+
+# create .bed file with: scaffold, start, end, type, info
+cut -f1,3,4,5,9 Candidate.gff3 | awk 'BEGIN {FS="\t"; OFS="\t"} {print $1, $3, $4, $2, $5}' > Candidate.bed
+
+# modify .bed to allow .vcf compatibility (scaffold name matching) - insert a . at 4th character in each line
+awk -vFS="" -vOFS="" '{$4=$4"."}1' Candidate.bed > Candidate.compatible.bed
+
+
+```
+
+
+#5b Intersect .vcf with .bed coordinates - BCFtools
+
+```{r  Intersect .vcf with .bed coordinates, eval=FALSE, engine='bash'}
+
+cd $GFF_Path
+
+mkdir VCF
+
+# bg compression required for bcftools view
+bgzip lp_species_SNPs_tagged_filtered.vcf
+
+# indexing of .vcf file required for bcftools view
+bcftools index lp_species_SNPs_tagged_filtered.vcf.gz
+
+bcftools view -Ov -o $GFF_Path/VCF/lp_species_SNPs_filtered_intersect.vcf -R Candidate.compatible.bed lp_species_SNPs_tagged_filtered.vcf.gz
+
+# optional uncompress file
+gunzip lp_species_SNPs_tagged_filtered.vcf.gz
+
+
+```
+
+
+#5b Intersect .vcf with .bed/.gff3 coordinates - BEDtools
+
+```{r  Intersect .vcf with .bed coordinates, eval=FALSE, engine='bash'}
+
+cd $GFF_Path
+
+mkdir VCF
+
+bedtools intersect -wb -header -a lp_species_SNPs_tagged_filtered.vcf.gz -b Candidate.compatible.bed > $GFF_Path/VCF/lp_bedIntersect.vcf
+
+```
+
+#5c Clear duplicates from Intersect results
+
+```{r  Clear duplicates from Intersect results, eval=FALSE, engine='bash'}
+
+cd $GFF_Path/VCF
+
+# copy header part
+grep "#" lp_bedIntersect.vcf > lp_bedIntersect_unique.vcf
+
+# copy table, remove duplicates, add it to header
+grep -v "#" lp_bedIntersect.vcf | sort -u -k1,2 >> lp_bedIntersect_unique.vcf
+
+```
+
