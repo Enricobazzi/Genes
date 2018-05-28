@@ -10,6 +10,10 @@ output:
 
 ```{r Define paths, eval=FALSE, engine='bash'}
 
+ssh -X ebazzicalupo@genomics-a.ebd.csic.es
+
+ssh -X ebazzicalupo@genomics-b.ebd.csic.es
+
 # path to gff data in my laptop
 GFF_Path=~/home/ebazzicalupo/Data
 
@@ -161,6 +165,8 @@ makeblastdb -in $BDB/lp23_plus_mt.fa -parse_seqids -dbtype nucl
 
 cd $GFF_Path/CatResults
 
+IFS=$'\n'
+
 CBLASTGENES=$(ls cat_*.fa)
 
 for GENE in ${CBLASTGENES[@]}
@@ -178,6 +184,48 @@ mkdir BLASTresults
 mv *.BLASTresults BLASTresults
 
 ```
+
+#2e: BLAST cat genes to Lynx discarded scaffold - BLAST installation required (from NCBI)
+
+```{r BLAST cat genes to Lynx discarded scaffold, eval=FALSE, engine='bash'}
+
+## Create BLAST database for discarded scaffold
+
+cd $GFF_Path
+
+mkdir Discarded_BLASTdatabase
+
+# in my laptop
+DSBDB=~/home/ebazzicalupo/Data/Discarded_BLASTdatabase
+# in server
+DSBDB=~/Data/Discarded_BLASTdatabase
+
+mv lp23.discarded.scaffolds.fa $DSBDB
+
+makeblastdb -in $DSBDB/lp23.discarded.scaffolds.fa -parse_seqids -dbtype nucl
+
+cd $GFF_Path/CatResults
+
+CDSBLASTGENES=$(ls cat_*.fa)
+IFS=$'\n'
+
+for GENE in ${CDSBLASTGENES[@]}
+  do
+  echo "$GENE starting BLAST"
+  blastn -query $GFF_Path/CatResults/${GENE} -db $DSBDB/lp23.discarded.scaffolds.fa -outfmt "6 qseqid sseqid sstart send length qcovhsp evalue" -out ${GENE/.fa/}.DSBLASTresults
+  echo "$GENE BLAST finished"
+  
+done
+
+# Move BLASTresults to new directory
+
+mkdir DSBLASTresults
+
+mv *.DSBLASTresults DSBLASTresults
+
+
+```
+
 
 #3a: Search cat empty results in Human annotations
 
@@ -303,8 +351,8 @@ grep -f ID.txt LYPA23C.all.fix.gff3 > Candidate.gff3
 # create .bed file with: scaffold, start, end, type, info
 cut -f1,3,4,5,9 Candidate.gff3 | awk 'BEGIN {FS="\t"; OFS="\t"} {print $1, $3, $4, $2, $5}' > Candidate.bed
 
-# modify .bed to allow .vcf compatibility (scaffold name matching) - insert a . at 4th character in each line
-awk -vFS="" -vOFS="" '{$4=$4"."}1' Candidate.bed > Candidate.compatible.bed
+# modify .bed to allow .vcf compatibility (scaffold name matching) - sort and insert a . at 4th character in each line
+sort -k1,2 Candidate.bed | awk -vFS="" -vOFS="" '{$4=$4"."}1' > Candidate.compatible.bed
 
 
 ```
@@ -341,15 +389,39 @@ cd $GFF_Path
 
 mkdir VCF
 
-bedtools intersect -wb -header -a lp_species_SNPs_tagged_filtered.vcf.gz -b Candidate.compatible.bed > $GFF_Path/VCF/lp_bedIntersect.vcf
+bedtools intersect -header -a lp_species_SNPs_tagged_filtered.vcf.gz -b Candidate.compatible.bed > $GFF_Path/VCF/lp_bedIntersect.vcf
+
 
 ```
 
-#5c Clear duplicates from Intersect results
+#5c Add information regarding "hit" region - BCFtools annotate
 
-```{r  Clear duplicates from Intersect results, eval=FALSE, engine='bash'}
+```{r  Add information regarding "hit" region - BCFtools, eval=FALSE, engine='bash'}
+
+cd $GFF_Path
+
+## ADD INFO REGARDING HIT REGION
+
+# index Candidate.compatible.bed
+bgzip Candidate.compatible.bed
+tabix -p bed Candidate.compatible.bed.gz
+mv Candidate.compatible.bed.* $GFF_Path/VCF
+
+# create headers file as instructed by bcftools annotate
 
 cd $GFF_Path/VCF
+
+touch headers
+nano headers
+
+# add information from indexed bed file to vcf
+bcftools annotate -a Candidate.compatible.bed.gz -h headers -c CHROM,FROM,TO,INFO/HRT,INFO/HRD lp_bedIntersect.vcf > lp_bedIntersect_annotated.vcf
+
+```
+
+#5d Clear duplicates from Intersect results
+
+```{r  Clear duplicates from Intersect results, eval=FALSE, engine='bash'}
 
 # copy header part
 grep "#" lp_bedIntersect.vcf > lp_bedIntersect_unique.vcf
